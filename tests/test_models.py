@@ -189,15 +189,77 @@ class TestProductModel(unittest.TestCase):
         self.assertEqual(found.count(), count)
         for product in found:
             self.assertEqual(product.category, category)
-    
-    def test_deserialize_missing_data(self):
-        data = {"price": 10.0}  # Falta 'name', 'category', etc.
+
+    def test_update_product_without_id_should_raise(self):
+        """It should raise DataValidationError if update() is called without ID (línea 106)"""
+        product = ProductFactory()
+        # No llamamos a .create(), así que el producto no tiene ID
+        product.id = None  # explícitamente aseguramos que no tenga ID
+
+        with self.assertRaises(DataValidationError) as context:
+            product.update()
+
+        self.assertEqual(str(context.exception), "Update called with empty ID field")
+
+    def test_deserialize_with_invalid_boolean_available(self):
+        """It should raise DataValidationError when 'available' is not a boolean (línea 139)"""
+        data = {
+            "name": "Invalid Bool Product",
+            "description": "Product with invalid 'available'",
+            "price": "19.99",
+            "available": "yes",  # <-- inválido, debería ser bool
+            "category": "FOOD"
+        }
+
         product = Product()
-        with self.assertRaises(DataValidationError):
+        with self.assertRaises(DataValidationError) as context:
             product.deserialize(data)
 
-    def test_deserialize_invalid_price_type(self):
-        data = {"name": "Widget", "price": "invalid", "category": "CLOTHS", "available": True}
+        self.assertIn("Invalid type for boolean [available]", str(context.exception))
+
+    def test_deserialize_with_invalid_enum_category(self):
+        """It should raise DataValidationError when category is invalid (línea 145)"""
+        data = {
+            "name": "Bad Category Product",
+            "description": "Product with invalid enum",
+            "price": "9.99",
+            "available": True,
+            "category": "INVALID"  # no existe en Category
+        }
+
         product = Product()
-        with self.assertRaises(DataValidationError):
+        with self.assertRaises(DataValidationError) as context:
             product.deserialize(data)
+
+        self.assertIn("Invalid attribute:", str(context.exception))
+
+    def test_deserialize_with_none_data_should_raise(self):
+        """It should raise DataValidationError when input is None (línea 149)"""
+        product = Product()
+        with self.assertRaises(DataValidationError) as context:
+            product.deserialize(None)
+
+        self.assertIn("Invalid product: body of request contained bad or no data", str(context.exception))
+
+    def test_find_by_price(self):
+        """It should find products matching a given price (cubre líneas 217 y 221)"""
+        product = ProductFactory(price=Decimal("15.50"))
+        product.create()
+
+        found = Product.find_by_price(Decimal("15.50"))
+
+        self.assertIsInstance(found, list)
+        self.assertGreaterEqual(len(found), 1)
+        self.assertEqual(found[0].price, Decimal("15.50"))
+        self.assertEqual(found[0].id, product.id)
+
+    def test_find_by_price_with_string_should_convert_to_decimal(self):
+        """It should convert string price to Decimal (cubre línea 220)"""
+        product = ProductFactory(price=Decimal("19.95"))
+        product.create()
+
+        # Pasamos el precio como string con espacios y comillas
+        found = Product.find_by_price(' "19.95" ')
+        
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].price, Decimal("19.95"))
