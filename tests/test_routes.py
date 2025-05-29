@@ -31,7 +31,7 @@ from unittest import TestCase
 from urllib.parse import quote_plus
 from service import app
 from service.common import status
-from service.models import db, init_db, Product
+from service.models import db, init_db, Product, Category
 from tests.factories import ProductFactory
 
 
@@ -282,3 +282,11 @@ class TestProductRoutes(TestCase):
         # check the data just to be sure
         for product in data:
             self.assertEqual(product["available"], True)
+    
+    def test_update_nonexistent_product(self):
+        """It should not Update a Product thats not exists"""
+        new_product = {"name": "Ghost", "price": 12.5, "category": "None", "available": True}
+        response = self.client.put("/products/9999", json=new_product)
+        self.assertEqual(response.status_code, 404)
+
+   

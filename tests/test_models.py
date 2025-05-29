@@ -27,7 +27,7 @@ import os
 import logging
 import unittest
 from decimal import Decimal
-from service.models import Product, Category, db
+from service.models import Product, Category, db, DataValidationError
 from service import app
 from tests.factories import ProductFactory
 
@@ -189,3 +189,15 @@ class TestProductModel(unittest.TestCase):
         self.assertEqual(found.count(), count)
         for product in found:
             self.assertEqual(product.category, category)
+    
+    def test_deserialize_missing_data(self):
+        data = {"price": 10.0}  # Falta 'name', 'category', etc.
+        product = Product()
+        with self.assertRaises(DataValidationError):
+            product.deserialize(data)
+
+    def test_deserialize_invalid_price_type(self):
+        data = {"name": "Widget", "price": "invalid", "category": "CLOTHS", "available": True}
+        product = Product()
+        with self.assertRaises(DataValidationError):
+            product.deserialize(data)
